@@ -1,0 +1,260 @@
+#lang racket
+
+(require "funciones-aux.rkt")
+(require 2htdp/batch-io)
+
+#|
+sudoku -> boolean
+OBJ: determinar si el sudoku es valido
+PRE: el formato de entrada debe ser el correcto
+|#
+(define (sudoku-valido? sudoku)
+  (not (comprobar-sudoku sudoku)))
+
+
+#|
+sudoku -> boolean
+OBJ: determinar si un cierto numero esta en el sudoku
+PRE: 
+|#
+(define (esta? sudoku num)
+  (for*/first ([i 9]
+               [j 9]
+               #:when (equal? (get-elem i j sudoku) num))
+    (list i j)))
+
+#|
+lista -> number
+OBJ: determinar el tamanno de una lista
+PRE: 
+|#
+(define (len lst)
+  (cond
+    [(empty? lst)  0]
+    [(cons? lst)   (+ 1 (length (rest lst)))]))
+
+#|
+numero, lista -> boolean
+OBJ: determinar si un numero esta en una fila
+PRE:
+|#
+(define (in-fila? numero fila)
+  (for/first ([i fila]
+        #:when (equal? i numero))
+         true))
+
+#|
+numero, numero, lista -> numero
+OBJ: contar cuantos veces aparece un cierto numero en una lista
+PRE:
+|#
+(define (cuantos? num lista)
+  (cond
+    [(empty? lista) 0]
+    [(equal? num (car lista)) (+ 1 (cuantos? num (cdr lista)))]
+    [else (cuantos? num (cdr lista))]))
+
+#|
+numero, numero, lista -> boolean
+OBJ: determinar si un elemento esta repetido en una lista
+PRE:
+|#
+(define (num-repetido? num lista)
+  (cond
+    [(> (cuantos? num lista) 1) true]
+    [else false]))
+
+#|
+lista -> boolean
+OBJ: determinar la posicion de un numero en una lista a partir de su cuadrante
+PRE: pos(i<9, j<9)
+|#
+(define (pos-cuadrante pos)
+  (+ (* (floor (/ (car pos) 3)) 3)  (floor (/ (car (cdr pos)) 3))))
+
+#|
+numero, numero, lista -> lista
+OBJ: colocar en una determinada posicion de la lista un numero
+PRE: posicion < len(lista)
+|#
+(define (colocar-num numero posicion lista)
+  (cond
+    [(equal? 0 posicion) (cons numero (cdr lista))]
+    [else (cons (car lista)(colocar-num numero (- posicion 1) (cdr lista)))]))
+
+#|
+lista, numero, sudoku -> sudoku
+OBJ: reemplazar una lista por otra en el sudoku
+PRE: len(lista) == 9 and 0 < pos < 9
+|#
+(define (colocar-list lista pos sudoku)
+  (cond
+   [(equal? pos 0) (cons lista (cdr sudoku))]
+   [else (cons (car sudoku) (colocar-list lista (- pos 1) (cdr sudoku)))]))
+
+
+#|
+sudoku -> nil
+OBJ: imprimir el sudoku por pantalla
+PRE:
+|#
+(define (imprimir-sudoku sudoku)
+  (for*
+      [(i 9)(j 9)]
+    (cond
+      [(equal? j 8) (display " ")(write (get-elem i j sudoku)) (display "\n")]
+      [else (display " ")(write (get-elem i j sudoku))]
+      )))
+
+#|
+sudoku -> boolean
+OBJ: determinar si el sudoku esta completo, es decir, no hay ningun cero
+PRE: 
+|#
+(define (sudoku-completo? sudoku)
+  (cond
+    [(equal? (esta? sudoku 0) false) true]
+    [else false]))
+
+#|
+sudoku -> boolean
+OBJ: recorrer el sudoku determinando su validez
+PRE: el formato de entrada debe ser el correcto
+|#
+(define (comprobar-sudoku sudoku)
+  (for*/first ([i 9]
+               [j 9]
+               #:when [or (< 9 (get-elem i j sudoku))
+                          (> 0 (get-elem i j sudoku))
+                          (and(not(= 0 (get-elem i j sudoku)))
+                              (or (num-repetido? (get-elem i j sudoku) (list-ref sudoku i)) ;compruebo si hay algun elemento repetido en las filas
+                                  (num-repetido? (get-elem i j sudoku) (get-columna j sudoku)) ;compruebo si hay algun elemento repetido en las columnas
+                                  (num-repetido? (get-elem i j sudoku) (get-cuadrante sudoku (floor (/ i 3)) (floor (/ j 3)))) ;compruebo si hay algun elemento repetido en los cuadrantes
+                                  ))]) true))
+
+#|
+sudoku, numero, lista -> boolean
+OBJ: determinar si una insercion de un numero es valida
+PRE: posicion(i<9, j<9)
+|#
+(define (operacion-valida? sudoku num posicion)
+  (cond
+    [(or (num-repetido? num (colocar-num num (car (cdr posicion))(list-ref sudoku (car posicion))))
+         (num-repetido? num (colocar-num num (car posicion) (get-columna (car (cdr posicion)) sudoku)))
+         (num-repetido? num (colocar-num num (pos-cuadrante posicion) (get-cuadrante sudoku (floor (/ (car posicion) 3)) (floor (/ (car (cdr posicion)) 3)))))
+         ) false]
+    [else true]))
+
+#|
+sudoku, numero, lista, numero -> lista
+OBJ: determinar los numeros validos para una posicion
+PRE: posicion(i<9, j<9) and iteracion = 9
+|#
+(define (get-lista-validos sudoku posicion iteracion)
+  (cond
+    [(equal? iteracion 0) '()]
+    [(operacion-valida? sudoku iteracion posicion) (reverse (cons iteracion (get-lista-validos sudoku posicion (- iteracion 1))))]
+    [(get-lista-validos sudoku posicion (- iteracion 1))]))
+
+#|
+lista, lista, sudoku, pila -> pila
+OBJ: generar sudokus validos
+PRE: 
+|#
+(define (generar-sudokus lista-validos pos sudoku pila)
+  (cond
+    [(empty? lista-validos) pila]
+    [else (generar-sudokus (cdr lista-validos) pos sudoku (cons (colocar-list (colocar-num (car lista-validos) (car (cdr pos)) (list-ref sudoku (car pos))) (car pos) sudoku) pila))]))
+
+#|
+sudoku, lista -> lista
+OBJ: resolver sudoku mediante busqueda en profundidad
+PRE: 
+|#
+(define (resolver-sudoku-bep sudoku abiertos)
+  (cond
+   [(sudoku-completo? sudoku) (imprimir-sudoku sudoku)]
+   [else (resolver-sudoku-bep (car(generar-sudokus(get-lista-validos sudoku (esta? sudoku 0) 9)(esta? sudoku 0) sudoku abiertos))
+                              (cdr(generar-sudokus(get-lista-validos sudoku (esta? sudoku 0) 9)(esta? sudoku 0) sudoku abiertos)))]))
+
+#|
+sudoku, lista -> lista
+OBJ: resolver sudoku mediante busqueda en anchura
+PRE: 
+|#
+(define (resolver-sudoku-bea sudoku abiertos)
+  (cond
+   [(sudoku-completo? sudoku) (imprimir-sudoku sudoku)]
+   [else (resolver-sudoku-bea (last(generar-sudokus(get-lista-validos sudoku (esta? sudoku 0) 9)(esta? sudoku 0) sudoku abiertos))
+                              (reverse(cdr (reverse(generar-sudokus(get-lista-validos sudoku (esta? sudoku 0) 9)(esta? sudoku 0) sudoku abiertos)))))]))
+
+#|
+lista -> lista
+OBJ: eliminar las listas innecesarias
+PRE: len lista > 9
+|#
+(define (delete-lists lista)
+  (cond
+    [(equal? (len lista) 9) lista]
+    [(member ";|" (car lista)) (delete-lists (append (cdr lista) (list (car lista))))]
+    [else (delete-lists (cdr lista))]))
+
+#|
+lista -> lista
+OBJ: limpiar una lisra para su posterior lectura
+PRE: len lista > 9
+|#
+(define (limpiar-lista lista)
+  (cond
+    [(equal? (len lista) 9) lista]
+    [(or (equal? "|" (car lista))(equal?  ";|" (car lista))) (limpiar-lista (cdr lista))]
+    [else (limpiar-lista (append (cdr lista) (list (string->number(car lista)))))]))
+
+#|
+lista, number -> lista
+OBJ: limpiar un sudoku completo
+PRE: 
+|#
+(define (limpiar-sudoku lista rep)
+  (cond
+    [(equal? rep 0) lista]
+    [else (limpiar-sudoku (append (cdr lista) (list (limpiar-lista (car lista)))) (- rep 1))]))
+
+#|
+nil -> nil
+OBJ: interfaz de usuario
+PRE: 
+|#
+(define (iniciar-sudoku-solver)
+  (display "--------- BIENVENIDO AL SUDOKU SOLVER ---------- \n")
+  (display "Mediante que algoritmo desea resolver el sudoku BEA o BEP \n")
+  (define metodo (read-line (current-input-port) 'any))
+  (display "Inidque el sudoku que desea resolver (sudoku1, sudoku2, ..., sudoku20)")
+  (define sudoku (read-line (current-input-port) 'any))
+  (display "\n -------SUDOKU RESUELTO----- \n")
+  (cond
+    [(equal? (sudoku-valido? (limpiar-sudoku (delete-lists (read-words/line (string-append "./test/" sudoku ".txt"))) 9)) false) (display "El sudoku no se puede resolver")]
+   [(equal? metodo "BEA")(resolver-sudoku-bea (limpiar-sudoku (delete-lists (read-words/line (string-append "./test/" sudoku ".txt"))) 9) '())]
+   [(equal? metodo "BEP")(resolver-sudoku-bep (limpiar-sudoku (delete-lists (read-words/line (string-append "./test/" sudoku ".txt"))) 9) '())]
+   [else (display "El metodo seleccionado no existe, selecciona BEA o BEP")]))
+
+;(limpiar-sudoku (delete-lists sudoku) 9)
+;(resolver-sudoku-bep (limpiar-sudoku (delete-lists sudoku1) 9) '())
+;(display "\n")
+;(resolver-sudoku-bea test1 '())
+
+(iniciar-sudoku-solver)
+
+
+
+
+
+
+
+
+
+
+
+
+
+

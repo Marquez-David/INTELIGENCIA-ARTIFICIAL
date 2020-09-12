@@ -1,0 +1,129 @@
+#lang racket
+
+(provide (all-defined-out))
+
+#|
+numero, numero, othello -> numero
+OBJ: devolver el valor de una posicion del othello
+PRE: 0 < x-coor and y-coor < 9
+|#
+(define (get-elem x-coor y-coor othello)
+  (list-ref (list-ref othello y-coor) x-coor))
+
+#|
+numero, numero, othello, numero  -> numero
+OBJ: modificar un valor determinado del tablero
+PRE: 0 < x-coor and y-coor < 9
+|#
+(define (set-elem x-coor y-coor othello value)
+  (cond
+    [(equal? y-coor 0) (cons (list-set (list-ref othello y-coor) x-coor value) (cdr othello))]
+    [else (cons (car othello)(set-elem x-coor (- y-coor 1) (cdr othello) value))]))
+
+#|
+othello, numero -> lista
+OBJ: devolver una determinada fila del tablero
+PRE: 0 < fila < 8
+|#
+(define (get-fila othello fila)
+  (list-ref othello fila))
+
+#|
+numero, othello -> lista
+OBJ: obtener una columna determinada del tablero
+PRE: columna < len(lista)
+|#
+(define (get-columna othello columna)
+  (cond
+    [(empty? othello) '()]
+    [else (cons (get-num-columna columna (car othello)) (get-columna (cdr othello) columna))]))
+
+#|
+numero, numero, lista -> numero
+OBJ: obtiene un numero de una lista dada
+PRE: indice < len(lista)
+|#
+(define (get-num-columna indice lista)
+  (cond
+    [(equal? indice 0) (car lista)]
+    [else (get-num-columna (- indice 1) (cdr lista))]))
+
+#|
+numero -> numero
+OBJ: devolover la pieza contraria a la dada
+PRE: pieza = 1/2
+|#
+(define (get-pieza-contraria pieza)
+  (cond
+    [(equal? pieza 1) 2]
+    [(equal? pieza 2) 1]))
+
+#|
+othello, numero, numero -> lista
+OBJ: obtener la diagonal principal del othello
+PRE: 0 < fila and columna < 9
+|#
+(define (get-diagonal othello columna fila)
+  (cond
+    [(> 0 (- fila columna)) (get-diagonal-aux othello columna fila)]
+    [else (get-diagonal-aux (trasponer-othello othello) fila columna)]))
+
+(define (get-diagonal-aux othello columna fila)
+  (cond
+    [(equal? 8 (- columna fila)) '()]
+    [else (cons (list-ref (car othello) (- columna fila)) (get-diagonal-aux  (cdr othello) (+ columna 1) fila ))]))
+
+#|
+othello, numero, numero -> lista
+OBJ: obtener la diagonal secundaria del othello
+PRE: 0 < fila and columna < 9
+|#
+(define (get-diagonal-secundaria othello columna fila)
+  (get-diagonal (invertir-othello othello) (- 7 columna) fila))
+
+#|
+othello -> othello
+OBJ: transponer el tablero
+PRE: 
+|#
+(define trasponer-othello
+  (lambda (xss)
+    (cond
+      [(empty? xss)         empty]
+      [(empty? (first xss)) empty]
+      [else                 (define first-column   (map first xss))
+                            (define other-columns  (map rest  xss))
+                            (cons first-column
+
+                                  (trasponer-othello other-columns))])))
+
+#|
+othello -> othello
+OBJ: invertir el tablero
+PRE: 
+|#
+(define (invertir-othello othello)
+  (cond
+    [(empty? othello) '()]
+    [else (cons (reverse (car othello)) (invertir-othello (cdr othello)))]))
+
+#|
+elem -> lista
+OBJ: determinar si la entradad dada es una lista, en caso contrario devolver lista vacia
+PRE: 
+|#
+(define (delete-voids l)
+  (cond
+    [(empty? l) '()]
+    [(pair? (car l)) (append (car l)(delete-voids (cdr l)))]
+    [else (delete-voids (cdr l))]))
+
+
+
+
+
+
+
+
+
+
